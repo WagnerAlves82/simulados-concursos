@@ -9,12 +9,12 @@ Este projeto permite criar e gerenciar simulados de concursos online.
 
 ## Tecnologias
 - Next.js
-- React
+- React oi
 - Node.js
 - Tailwind CSS
 
 ## Screenshots
-![Tela Inicial](assets/tela-inicial.png)
-![Cadastro de Questões](assets/cadastro-questoes.png)
+![Tela Inicial](assets/tela-inicial.jpg)
+![Cadastro de Questões](assets/cadastro-questoes.jpg)
 
 ---
