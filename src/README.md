@@ -9,7 +9,7 @@ Este projeto permite criar e gerenciar simulados de concursos online.
 
 ## Tecnologias
 - Next.js
-- React oi
+- React
 - Node.js
 - Tailwind CSS
 

@@ -43,10 +43,10 @@ export default function HomePage() {
             100% Gratuito - Sempre
           </Badge>
           <h2 className="text-5xl font-bold text-gray-900 mb-6">
-            Prepare-se para <span className="text-blue-600">Agente de Educação Infantil</span>
+            Prepare-se para <span className="text-blue-600">sua aprovação</span>
           </h2>
           <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-            120 questões comentadas da banca HC Assessoria para São Lourenço do Oeste/SC. 
+            Questões comentadas diversas bancas. 
             Feedback detalhado, estatísticas de desempenho e acompanhamento personalizado.
           </p>
           
