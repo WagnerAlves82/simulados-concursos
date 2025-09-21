@@ -257,50 +257,45 @@ export function AdminDashboardContent() {
 
   // Criar nova área
   const handleCriarArea = async () => {
-    if (!novaArea.nome) {
-      toast({
-        title: "Erro",
-        description: "Preencha o nome da área",
-        variant: "destructive"
-      })
-      return
-    }
-
-    setCriandoArea(true)
-    try {
-      const { data, error } = await adminService.criarArea(novaArea)
-        .from('areas_conhecimento')
-        .insert([novaArea])
-        .select()
-
-      if (error) throw error
-
-      toast({
-        title: "Sucesso!",
-        description: "Área criada com sucesso!"
-      })
-
-      // Limpar formulário
-      setNovaArea({
-        nome: '',
-        descricao: ''
-      })
-      setMostrarFormArea(false)
-
-      // Recarregar dados
-      await loadDashboardData()
-
-    } catch (error) {
-      console.error('Erro ao criar área:', error)
-      toast({
-        title: "Erro",
-        description: "Erro ao criar área",
-        variant: "destructive"
-      })
-    } finally {
-      setCriandoArea(false)
-    }
+  if (!novaArea.nome) {
+    toast({
+      title: "Erro",
+      description: "Preencha o nome da área",
+      variant: "destructive"
+    })
+    return
   }
+
+  setCriandoArea(true)
+  try {
+      await adminService.criarArea(novaArea)
+
+    toast({
+      title: "Sucesso!",
+      description: "Área criada com sucesso!"
+    })
+
+    // Limpar formulário
+    setNovaArea({
+      nome: '',
+      descricao: ''
+    })
+    setMostrarFormArea(false)
+
+    // Recarregar dados
+    await loadDashboardData()
+
+  } catch (error) {
+    console.error('Erro ao criar área:', error)
+    toast({
+      title: "Erro",
+      description: "Erro ao criar área",
+      variant: "destructive"
+    })
+  } finally {
+    setCriandoArea(false)
+  }
+}
 
   // Componente para criar nova questão
   const NovaQuestaoForm = () => (
@@ -665,29 +660,34 @@ export function AdminDashboardContent() {
                   <CardTitle>Questões por Área</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    {Object.entries(stats.questoesPorArea).length > 0 ? (
-                      Object.entries(stats.questoesPorArea).map(([area, count]) => (
-                        <div key={area} className="flex items-center justify-between">
-                          <span className="text-sm font-medium">{area}</span>
-                          <div className="flex items-center space-x-2">
-                            <div className="w-20 h-2 bg-gray-200 rounded-full">
-                              <div 
-                                className="h-2 bg-blue-600 rounded-full" 
-                                style={{ width: `${stats.totalQuestoes > 0 ? (count / stats.totalQuestoes) * 100 : 0}%` }}
-                              />
-                            </div>
-                            <span className="text-sm text-gray-600">{count}</span>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-8 text-gray-500">
-                        <AlertCircle className="h-8 w-8 mx-auto mb-2" />
-                        <p>Nenhuma questão cadastrada ainda</p>
-                      </div>
-                    )}
-                  </div>
+                 <div className="space-y-4">
+  {Object.entries(stats.questoesPorArea).length > 0 ? (
+    Object.entries(stats.questoesPorArea).map(([area, count]) => {
+      const countNumber = Number(count);
+      const percentage = stats.totalQuestoes > 0 ? (countNumber / stats.totalQuestoes) * 100 : 0;
+      
+      return (
+        <div key={area} className="flex items-center justify-between">
+          <span className="text-sm font-medium">{area}</span>
+          <div className="flex items-center space-x-2">
+            <div className="w-20 h-2 bg-gray-200 rounded-full">
+              <div 
+                className="h-2 bg-blue-600 rounded-full" 
+                style={{ width: `${percentage}%` }}
+              />
+            </div>
+            <span className="text-sm text-gray-600">{countNumber}</span>
+          </div>
+        </div>
+      );
+    })
+  ) : (
+    <div className="text-center py-8 text-gray-500">
+      <AlertCircle className="h-8 w-8 mx-auto mb-2" />
+      <p>Nenhuma questão cadastrada ainda</p>
+    </div>
+  )}
+</div>
                 </CardContent>
               </Card>
 

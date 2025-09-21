@@ -34,12 +34,25 @@ export interface BancaDetalhada {
 export class AdminService {
   private supabase = createClient();
 
-  async criarArea(novaArea: any) {
-    return await this.supabase
+ async criarArea(areaData: {
+  nome: string;
+  descricao?: string;
+}) {
+  try {
+    const { data, error } = await this.supabase
       .from('areas_conhecimento')
-      .insert([novaArea])
-      .select();
+      .insert([areaData])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+
+  } catch (error) {
+    console.error('Erro ao criar área:', error);
+    throw new Error('Erro ao criar área de conhecimento');
   }
+}
 
   async listarAreas() {
     return await this.supabase
