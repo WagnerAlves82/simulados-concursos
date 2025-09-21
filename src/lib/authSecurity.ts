@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase';
+import { useState, useMemo, useCallback } from 'react';
 
 export type UserRole = 'user' | 'admin' | 'superadmin';
 
@@ -185,20 +186,25 @@ export class AuthSecurityService {
   /**
    * Log de ações administrativas
    */
-  async logAction(userId: string, action: string, details?: any) {
-    try {
-      await this.supabase
-        .from('admin_logs')
-        .insert({
-          user_id: userId,
-          action,
-          details: details ? JSON.stringify(details) : null,
-          timestamp: new Date().toISOString()
-        });
-    } catch (error) {
-      console.error('Erro ao registrar log:', error);
+
+async logAction(userId: string, action: string, details?: any) {
+  try {
+    const { error } = await this.supabase
+      .from('admin_logs')
+      .insert({
+        user_id: userId,
+        action,
+        details: details || null
+        // timestamp será preenchido automaticamente pelo DEFAULT now()
+      });
+
+    if (error) {
+      console.error('Erro ao inserir log:', error);
     }
+  } catch (error) {
+    console.error('Erro ao registrar log:', error);
   }
+}
 }
 
 // Hook para usar as permissões

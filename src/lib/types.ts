@@ -16,34 +16,72 @@ export type Database = {
   }
 
   
-  public: {
-    Tables: {
-      areas_conhecimento: {
-        Row: {
-          created_at: string | null
-          descricao: string | null
-          id: number
-          nome: string
-        }
-        Insert: {
-          created_at?: string | null
-          descricao?: string | null
-          id?: number
-          nome: string
-        }
-        Update: {
-          created_at?: string | null
-          descricao?: string | null
-          id?: number
-          nome?: string
-        }
-        Relationships: []
+public: {
+  Tables: {
+    areas_conhecimento: {
+      Row: {
+        created_at: string | null
+        descricao: string | null
+        id: number
+        nome: string
       }
+      Insert: {
+        created_at?: string | null
+        descricao?: string | null
+        id?: number
+        nome: string
+      }
+      Update: {
+        created_at?: string | null
+        descricao?: string | null
+        id?: number
+        nome?: string
+      }
+      Relationships: []
+    },
+    admin_logs: {
+      Row: {
+        id: number
+        user_id: string | null
+        action: string
+        details: Json | null
+        timestamp: string | null
+        ip_address: string | null
+        user_agent: string | null
+      }
+      Insert: {
+        id?: number
+        user_id?: string | null
+        action: string
+        details?: Json | null
+        timestamp?: string | null
+        ip_address?: string | null
+        user_agent?: string | null
+      }
+      Update: {
+        id?: number
+        user_id?: string | null
+        action?: string
+        details?: Json | null
+        timestamp?: string | null
+        ip_address?: string | null
+        user_agent?: string | null
+      }
+      Relationships: [
+        {
+          foreignKeyName: "admin_logs_user_id_fkey"
+          columns: ["user_id"]
+          isOneToOne: false
+          referencedRelation: "profiles"
+          referencedColumns: ["id"]
+        }
+      ]
+    },
       cargo_areas: {
         Row: {
-          area_id: number | null
           cargo_id: number | null
           created_at: string | null
+          area_id: number | null
           id: number
           numero_questoes: number
           peso: number | null
@@ -606,3 +644,23 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
+// Tipos auxiliares para facilitar o uso
+export type Cargo = Tables<'cargos'>
+export type Area = Tables<'areas_conhecimento'>
+export type Questao = Tables<'questoes'>
+export type Simulado = Tables<'simulados'>
+export type SimuladoQuestao = Tables<'simulado_questoes'>
+export type EstatisticaArea = Tables<'estatisticas_areas'>
+
+// Tipos para inserção
+export type CargoInsert = TablesInsert<'cargos'>
+export type AreaInsert = TablesInsert<'areas_conhecimento'>
+export type QuestaoInsert = TablesInsert<'questoes'>
+export type SimuladoInsert = TablesInsert<'simulados'>
+
+// Tipos para atualização
+export type CargoUpdate = TablesUpdate<'cargos'>
+export type AreaUpdate = TablesUpdate<'areas_conhecimento'>
+export type QuestaoUpdate = TablesUpdate<'questoes'>
+export type SimuladoUpdate = TablesUpdate<'simulados'>

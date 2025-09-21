@@ -268,7 +268,7 @@ export function AdminDashboardContent() {
 
     setCriandoArea(true)
     try {
-      const { data, error } = await adminService.supabase
+      const { data, error } = await adminService.criarArea(novaArea)
         .from('areas_conhecimento')
         .insert([novaArea])
         .select()

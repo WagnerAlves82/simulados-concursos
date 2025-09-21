@@ -34,9 +34,28 @@ export interface BancaDetalhada {
 export class AdminService {
   private supabase = createClient();
 
-  /**
-   * Buscar estatísticas gerais do dashboard
-   */
+  async criarArea(novaArea: any) {
+    return await this.supabase
+      .from('areas_conhecimento')
+      .insert([novaArea])
+      .select();
+  }
+
+  async listarAreas() {
+    return await this.supabase
+      .from('areas_conhecimento')
+      .select('*');
+  }
+
+  async deletarArea(id: number) {
+    return await this.supabase
+      .from('areas_conhecimento')
+      .delete()
+      .eq('id', id);
+  }
+
+
+ 
   async buscarEstatisticas(): Promise<AdminStats> {
     try {
       // 1. Total de questões
@@ -79,23 +98,27 @@ export class AdminService {
         questoesPorBanca[banca] = (questoesPorBanca[banca] || 0) + 1;
       });
 
-      // 6. Questões por área - usando queries separadas
-      const areaIds = [...new Set(questoes?.map(q => q.area_id).filter(id => id !== null && id !== undefined))];
-      
-      const { data: areas } = await this.supabase
-        .from('areas_conhecimento')
-        .select('id, nome')
-        .in('id', areaIds);
+  const { data: questoesComArea } = await this.supabase
+  .from('questoes')
+  .select('area_id')
+  .eq('ativo', true)
+  .not('area_id', 'is', null);
 
-      const questoesPorArea: Record<string, number> = {};
-      questoes?.forEach(q => {
-        if (q.area_id) {
-          const area = areas?.find(a => a.id === q.area_id);
-          const areaName = area?.nome || 'Área Desconhecida';
-          questoesPorArea[areaName] = (questoesPorArea[areaName] || 0) + 1;
-        }
-      });
+const areaIds = [...new Set(questoesComArea?.map(q => q.area_id).filter(Boolean))] as number[];
 
+const { data: areas } = await this.supabase
+  .from('areas_conhecimento')
+  .select('id, nome')
+  .in('id', areaIds);
+
+const questoesPorArea: Record<string, number> = {};
+questoesComArea?.forEach(q => {
+  if (q.area_id) {
+    const area = areas?.find(a => a.id === q.area_id);
+    const areaName = area?.nome || 'Área Desconhecida';
+    questoesPorArea[areaName] = (questoesPorArea[areaName] || 0) + 1;
+  }
+});
 
       
       // 7. Acessos recentes (últimos 7 dias)
@@ -269,56 +292,85 @@ export class AdminService {
   }
 
   /**
-   * Buscar questões com filtros
-   */
-  async buscarQuestoes(filtros: {
-    cargo_id?: number;
-    area_id?: number;
-    busca?: string;
-    limit?: number;
-    offset?: number;
-  }) {
-    try {
-      let query = this.supabase
-        .from('questoes')
-        .select(`
-          *,
-          cargos(nome),
-          areas_conhecimento(nome)
-        `)
-        .eq('ativo', true)
-        .order('created_at', { ascending: false });
+ * Buscar questões com filtros - versão simplificada
+ */
+async buscarQuestoes(filtros: {
+  cargo_id?: number;
+  area_id?: number;
+  busca?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  try {
+    let query = this.supabase
+      .from('questoes')
+      .select('*')
+      .eq('ativo', true)
+      .order('created_at', { ascending: false });
 
-      if (filtros.cargo_id) {
-        query = query.eq('cargo_id', filtros.cargo_id);
-      }
-
-      if (filtros.area_id) {
-        query = query.eq('area_id', filtros.area_id);
-      }
-
-      if (filtros.busca) {
-        query = query.ilike('enunciado', `%${filtros.busca}%`);
-      }
-
-      if (filtros.limit) {
-        query = query.limit(filtros.limit);
-      }
-
-      if (filtros.offset) {
-        query = query.range(filtros.offset, filtros.offset + (filtros.limit || 10) - 1);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      return data || [];
-
-    } catch (error) {
-      console.error('Erro ao buscar questões:', error);
-      throw new Error('Erro ao buscar questões');
+    if (filtros.cargo_id) {
+      query = query.eq('cargo_id', filtros.cargo_id);
     }
+
+    if (filtros.area_id) {
+      query = query.eq('area_id', filtros.area_id);
+    }
+
+    if (filtros.busca) {
+      query = query.ilike('enunciado', `%${filtros.busca}%`);
+    }
+
+    if (filtros.limit) {
+      query = query.limit(filtros.limit);
+    }
+
+    if (filtros.offset) {
+      query = query.range(filtros.offset, filtros.offset + (filtros.limit || 10) - 1);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+    
+    // Buscar nomes de cargos e áreas separadamente se necessário
+    const questoesComDetalhes = await Promise.all(
+      (data || []).map(async (questao) => {
+        let cargoNome = null;
+        let areaNome = null;
+
+        if (questao.cargo_id) {
+          const { data: cargo } = await this.supabase
+            .from('cargos')
+            .select('nome')
+            .eq('id', questao.cargo_id)
+            .single();
+          cargoNome = cargo?.nome;
+        }
+
+        if (questao.area_id) {
+          const { data: area } = await this.supabase
+            .from('areas_conhecimento')
+            .select('nome')
+            .eq('id', questao.area_id)
+            .single();
+          areaNome = area?.nome;
+        }
+
+        return {
+          ...questao,
+          cargo_nome: cargoNome,
+          area_nome: areaNome
+        };
+      })
+    );
+
+    return questoesComDetalhes;
+
+  } catch (error) {
+    console.error('Erro ao buscar questões:', error);
+    throw new Error('Erro ao buscar questões');
   }
+}
 
   /**
    * Deletar questão
@@ -368,50 +420,66 @@ export class AdminService {
     }
   }
 
-  /**
-   * Exportar questões em CSV
-   */
-  async exportarQuestoes(cargo_id?: number) {
-    try {
-      let query = this.supabase
-        .from('questoes')
-        .select(`
-          *,
-          cargos(nome),
-          areas_conhecimento(nome)
-        `)
-        .eq('ativo', true);
+ /**
+ * Exportar questões em CSV
+ */
+async exportarQuestoes(cargo_id?: number) {
+  try {
+    // Buscar questões primeiro
+    let query = this.supabase
+      .from('questoes')
+      .select('*')
+      .eq('ativo', true);
 
-      if (cargo_id) {
-        query = query.eq('cargo_id', cargo_id);
-      }
+    if (cargo_id) {
+      query = query.eq('cargo_id', cargo_id);
+    }
 
-      const { data, error } = await query;
+    const { data: questoes, error } = await query;
 
-      if (error) throw error;
+    if (error) throw error;
 
-      // Converter para CSV
-      const csvData = data?.map(q => ({
+    // Buscar cargos e áreas separadamente
+    const cargoIds = [...new Set(questoes?.map(q => q.cargo_id).filter(Boolean))];
+    const areaIds = [...new Set(questoes?.map(q => q.area_id).filter(Boolean))];
+
+    const [cargosData, areasData] = await Promise.all([
+      this.supabase
+        .from('cargos')
+        .select('id, nome')
+        .in('id', cargoIds),
+      this.supabase
+        .from('areas_conhecimento')
+        .select('id, nome')
+        .in('id', areaIds)
+    ]);
+
+    // Converter para CSV
+    const csvData = questoes?.map(q => {
+      const cargo = cargosData.data?.find(c => c.id === q.cargo_id);
+      const area = areasData.data?.find(a => a.id === q.area_id);
+
+      return {
         id: q.id,
-        cargo: q.cargos?.nome,
-        area: q.areas_conhecimento?.nome,
+        cargo: cargo?.nome || 'N/A',
+        area: area?.nome || 'N/A',
         enunciado: q.enunciado,
         alternativa_a: q.alternativa_a,
         alternativa_b: q.alternativa_b,
         alternativa_c: q.alternativa_c,
         alternativa_d: q.alternativa_d,
-        alternativa_e: q.alternativa_e,
+        alternativa_e: q.alternativa_e || '',
         resposta_correta: q.resposta_correta,
         feedback: q.feedback,
         dificuldade: q.dificuldade,
-        fonte: q.fonte
-      }));
+        fonte: q.fonte || ''
+      };
+    });
 
-      return csvData || [];
+    return csvData || [];
 
-    } catch (error) {
-      console.error('Erro ao exportar questões:', error);
-      throw new Error('Erro ao exportar questões');
-    }
+  } catch (error) {
+    console.error('Erro ao exportar questões:', error);
+    throw new Error('Erro ao exportar questões');
   }
-}
+}}
