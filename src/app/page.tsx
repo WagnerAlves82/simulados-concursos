@@ -28,7 +28,7 @@ export default function HomePage() {
             <Link href="/login">
               <Button variant="outline">Entrar</Button>
             </Link>
-            <Link href="/register">
+            <Link href="/login">
               <Button>Cadastrar Grátis</Button>
             </Link>
           </div>
@@ -58,7 +58,7 @@ export default function HomePage() {
                 Começar Simulado Agora
               </Button>
             </Link>
-            <Link href="/register">
+            <Link href="/login">
               <Button size="lg" variant="outline" className="px-8 py-3 text-lg">
                 Fazer Login/Cadastro
               </Button>
