@@ -1,3 +1,6 @@
+/*
+   
+   
 'use client'
 
 import React from 'react'
@@ -16,8 +19,8 @@ export default function DebugQuestoes() {
       </div>
       
       <div className="text-xs space-y-2">
-        {/* Status Principal */}
-        <div className="grid grid-cols-2 gap-2">
+        {/* Status Principal */
+      /* <div className="grid grid-cols-2 gap-2">
           <div className={`p-2 rounded ${loading ? 'bg-yellow-100' : 'bg-green-100'}`}>
             <div className="font-medium">Loading</div>
             <div>{loading ? 'SIM' : 'NÃO'}</div>
@@ -28,24 +31,24 @@ export default function DebugQuestoes() {
           </div>
         </div>
 
-        {/* Contadores */}
-        <div className="bg-blue-50 p-2 rounded">
+      /*  {/* Contadores */
+       /* <div className="bg-blue-50 p-2 rounded">
           <div className="font-medium mb-1">Contadores:</div>
           <div>Questões: <strong>{questoes.length}</strong></div>
           <div>Áreas: <strong>{areas.length}</strong></div>
           <div>isReady: <strong>{debug?.isReady ? 'SIM' : 'NÃO'}</strong></div>
         </div>
 
-        {/* Erro Detalhado */}
-        {error && (
+        {/* Erro Detalhado */
+       /* {error && (
           <div className="bg-red-50 p-2 rounded border border-red-200">
             <div className="font-medium text-red-700 mb-1">Erro:</div>
             <div className="text-red-600 text-xs">{error}</div>
           </div>
         )}
 
-        {/* Debug Expandido */}
-        {debug && (
+        {/* Debug Expandido */
+       /* {debug && (
           <div className="bg-gray-50 p-2 rounded">
             <div className="font-medium mb-1">Debug Info:</div>
             <div>LastCargoId: {debug.lastCargoId}</div>
@@ -54,8 +57,8 @@ export default function DebugQuestoes() {
           </div>
         )}
 
-        {/* Questões por Área */}
-        {debug?.questoesPorArea && Object.keys(debug.questoesPorArea).length > 0 && (
+        {/* Questões por Área */
+       /* {debug?.questoesPorArea && Object.keys(debug.questoesPorArea).length > 0 && (
           <div className="bg-green-50 p-2 rounded">
             <div className="font-medium mb-1">Por Área:</div>
             {Object.entries(debug.questoesPorArea).map(([area, qtd]) => (
@@ -66,8 +69,8 @@ export default function DebugQuestoes() {
           </div>
         )}
 
-        {/* Áreas Configuradas */}
-        {debug?.areasConfiguradas && debug.areasConfiguradas.length > 0 && (
+        {/* Áreas Configuradas */
+      /*  {debug?.areasConfiguradas && debug.areasConfiguradas.length > 0 && (
           <div className="bg-purple-50 p-2 rounded">
             <div className="font-medium mb-1">Áreas Config:</div>
             {debug.areasConfiguradas.map(area => (
@@ -78,8 +81,8 @@ export default function DebugQuestoes() {
           </div>
         )}
 
-        {/* Amostra de Questões */}
-        {debug?.amostraQuestoes && debug.amostraQuestoes.length > 0 && (
+        {/* Amostra de Questões */
+     /*   {debug?.amostraQuestoes && debug.amostraQuestoes.length > 0 && (
           <div className="bg-yellow-50 p-2 rounded">
             <div className="font-medium mb-1">Amostra:</div>
             {debug.amostraQuestoes.map(q => (
@@ -90,8 +93,8 @@ export default function DebugQuestoes() {
           </div>
         )}
 
-        {/* Botão de Atualizar */}
-        <button 
+        {/* Botão de Atualizar */
+     /*   <button 
           onClick={() => window.location.reload()}
           className="w-full bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700"
         >
@@ -101,3 +104,4 @@ export default function DebugQuestoes() {
     </div>
   )
 }
+*/
