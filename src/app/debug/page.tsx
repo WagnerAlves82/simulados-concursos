@@ -87,9 +87,10 @@ export default function ProjectDiagnostic() {
         for (const table of tables) {
           try {
             const { data, error } = await supabase
-              .from(table)
-              .select('*')
-              .limit(1)
+            .from(table as any) // ou 'as const'
+            .select('*')
+            .limit(1)
+
 
             addResult({
               test: `🗄️ Tabela: ${table}`,
