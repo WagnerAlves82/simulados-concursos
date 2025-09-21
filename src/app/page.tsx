@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { BookOpen, Clock, Target, Users, CheckCircle2, Star, Play, Trophy, BarChart3 } from 'lucide-react'
-import DebugQuestoes from '@/components/simulado/DebugQuestoes'
+
 
 
 export default function HomePage() {

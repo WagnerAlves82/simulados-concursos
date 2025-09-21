@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useQuestoes } from '@/hooks/useQuestoes';
 import { QuestaoCompleta } from '@/lib/questoesServices';
-import DebugQuestoes from '@/components/simulado/DebugQuestoes'; // 🔍 ADICIONADO
+
 import { 
   BookOpen, 
   Clock, 
@@ -193,8 +193,7 @@ const SimuladoPage = () => {
   if (loadingQuestoes) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        {/* 🔍 DEBUG DURANTE LOADING */}
-        <DebugQuestoes />
+     
         
         <div className="text-center">
           <Loader2 className="h-12 w-12 animate-spin mx-auto text-blue-600 mb-4" />
@@ -209,8 +208,7 @@ const SimuladoPage = () => {
   if (errorQuestoes) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        {/* 🔍 DEBUG DURANTE ERRO */}
-        <DebugQuestoes />
+      
         
         <Card className="max-w-md">
           <CardContent className="p-6 text-center">
@@ -275,7 +273,7 @@ const SimuladoPage = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
         {/* 🔍 COMPONENTE DE DEBUG ADICIONADO AQUI */}
-        <DebugQuestoes />
+        
         
         <AuthHeader />
 
