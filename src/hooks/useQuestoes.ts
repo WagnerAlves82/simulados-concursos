@@ -1,3 +1,4 @@
+// src/hooks/useQuestoes.ts - VERSÃO COMPLETA
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { QuestoesService, QuestaoCompleta, AreaEstatistica } from '@/lib/questoesServices'
 import { useAuth } from '@/contexts/AuthProvider'
@@ -10,12 +11,13 @@ export function useQuestoes(cargoId: number = 1) {
   const [error, setError] = useState<string | null>(null)
   const [lastCargoId, setLastCargoId] = useState<number | null>(null)
   
-  // Memorizar a instância do service para evitar recriações
+  // Estados para controle do modal
+  const [questoesRespondidas, setQuestoesRespondidas] = useState(0)
+  const [showLoginModal, setShowLoginModal] = useState(false)
+  
   const questoesService = useMemo(() => new QuestoesService(), [])
 
-  // Função para carregar questões (com useCallback para evitar re-renders desnecessários)
   const carregarQuestoes = useCallback(async (forceReload = false) => {
-    // Evitar chamadas desnecessárias se o cargoId não mudou
     if (!forceReload && lastCargoId === cargoId && questoes.length > 0) {
       console.log('Questões já carregadas para este cargo, pulando...')
       return
@@ -25,35 +27,56 @@ export function useQuestoes(cargoId: number = 1) {
       setLoading(true)
       setError(null)
       
-      console.log(`🔄 Carregando questões para cargo ${cargoId}...`)
+      console.log(`Carregando questões para cargo ${cargoId}...`)
       
-      // Primeiro testar a conexão
       await questoesService.testarConexao()
-      console.log('✅ Conexão com Supabase OK')
+      console.log('Conexão com Supabase OK')
       
-      // Buscar questões
       const resultado = await questoesService.buscarQuestoesPorCargo(cargoId)
-      
-      console.log(`📊 Resultado da busca:`, {
+      console.log('Debug - Raw resultado do service:', {
+      questoes: resultado.questoes.slice(0, 3).map(q => ({
+    id: q.id,
+    area_id: q.area_id,
+    area_nome: q.area_nome,
+    enunciado: q.enunciado.substring(0, 50)
+  })),
+  areas: resultado.areas.map(a => ({
+    id: a.id,
+    nome: a.nome,
+    total_questoes: a.total_questoes
+  }))
+})
+      console.log('Debug - Raw resultado do service:');
+console.log('Questões (primeiras 3):', resultado.questoes.slice(0, 3).map(q => ({
+  id: q.id,
+  area_id: q.area_id,
+  area_nome: q.area_nome,
+  enunciado: q.enunciado?.substring(0, 50) + '...'
+})));
+console.log('Áreas:', resultado.areas.map(a => ({
+  id: a.id,
+  nome: a.nome,
+  total_questoes: a.total_questoes
+})));
+      console.log(`Resultado da busca:`, {
         totalQuestoes: resultado.questoes.length,
         totalAreas: resultado.areas.length,
         areas: resultado.areas.map(a => ({ id: a.id, nome: a.nome, questoes: a.total_questoes }))
       })
       
       if (resultado.questoes.length === 0) {
-        console.warn(`⚠️ Nenhuma questão encontrada para o cargo ${cargoId}`)
+        console.warn(`Nenhuma questão encontrada para o cargo ${cargoId}`)
         setError(`Nenhuma questão encontrada para o cargo selecionado`)
       } else {
-        setQuestoes(resultado.questoes)
+        setQuestoes(resultado.questoes) // Retorna TODAS as questões
         setAreas(resultado.areas)
         setLastCargoId(cargoId)
-        console.log(`✅ ${resultado.questoes.length} questões carregadas com sucesso`)
+        console.log(`${resultado.questoes.length} questões carregadas com sucesso`)
       }
       
     } catch (err) {
-      console.error('❌ Erro ao carregar questões:', err)
+      console.error('Erro ao carregar questões:', err)
       
-      // Tratamento de erro mais específico
       if (err instanceof Error) {
         if (err.message.includes('JWT')) {
           setError('Erro de autenticação. Faça login novamente.')
@@ -70,36 +93,110 @@ export function useQuestoes(cargoId: number = 1) {
     }
   }, [cargoId, lastCargoId, questoes.length, questoesService])
 
-  // Carregar questões quando o cargoId mudar
   useEffect(() => {
     if (cargoId) {
       carregarQuestoes()
     }
   }, [cargoId, carregarQuestoes])
 
-  // Gerar simulado personalizado
-  const gerarSimulado = useCallback(async (): Promise<QuestaoCompleta[]> => {
+  // Gerar simulado completo com níveis de dificuldade
+  const gerarSimulado = useCallback(async (
+    dificuldades: number[] = [1, 2, 3]
+  ): Promise<QuestaoCompleta[]> => {
     try {
-      console.log(`🎯 Gerando simulado para cargo ${cargoId}...`)
+      console.log(`Gerando simulado para cargo ${cargoId} com dificuldades:`, dificuldades)
       
-      const questoesSimulado = await questoesService.gerarSimuladoPersonalizado(cargoId)
+      const questoesSimulado = await questoesService.gerarSimuladoPersonalizado(cargoId, dificuldades)
       
-      console.log(`✅ Simulado gerado: ${questoesSimulado.length} questões`)
-      console.log('📋 Distribuição por área:', 
-        questoesSimulado.reduce((acc, q) => {
-          acc[q.area_nome] = (acc[q.area_nome] || 0) + 1
-          return acc
-        }, {} as Record<string, number>)
-      )
+      console.log(`Simulado gerado: ${questoesSimulado.length} questões`)
       
       return questoesSimulado
     } catch (err) {
-      console.error('❌ Erro ao gerar simulado:', err)
+      console.error('Erro ao gerar simulado:', err)
       throw new Error('Erro ao gerar simulado. Tente novamente.')
     }
   }, [cargoId, questoesService])
 
-  // Salvar resultado (apenas para usuários logados)
+  // NOVO: Gerar simulado por área específica
+  const gerarSimuladoPorArea = useCallback(async (
+    areaId: number,
+    dificuldades: number[] = [1, 2, 3],
+    limite: number = 30
+  ): Promise<QuestaoCompleta[]> => {
+    try {
+      console.log(`Gerando simulado da área ${areaId} com ${limite} questões`)
+      
+      // Buscar questões da área específica
+      const questoesDaArea = await questoesService.buscarQuestoesPorArea(cargoId, areaId)
+      
+      // Filtrar por dificuldade
+      const questoesFiltradas = questoesDaArea.filter(q => 
+        dificuldades.includes(q.dificuldade || 2)
+      )
+      
+      console.log(`Questões filtradas por dificuldade: ${questoesFiltradas.length}`)
+      
+      // Embaralhar as questões
+      const questoesEmbaralhadas = questoesFiltradas
+        .sort(() => Math.random() - 0.5)
+      
+      // Limitar quantidade
+      const questoesLimitadas = questoesEmbaralhadas.slice(0, limite)
+      
+      console.log(`Simulado por área gerado: ${questoesLimitadas.length} questões`)
+      
+      return questoesLimitadas
+    } catch (err) {
+      console.error('Erro ao gerar simulado por área:', err)
+      throw new Error('Erro ao gerar simulado da área. Tente novamente.')
+    }
+  }, [cargoId, questoesService])
+
+  // Controle de questões respondidas e modal
+  const registrarQuestaoRespondida = useCallback(async (): Promise<boolean> => {
+    // Se usuário está logado, nunca mostrar modal
+    if (user) {
+      return false;
+    }
+
+    const novoContador = questoesRespondidas + 1;
+    setQuestoesRespondidas(novoContador);
+
+    // Verificar se deve mostrar modal (após 3 questões)
+    if (novoContador >= 3) {
+      const modalInfo = await questoesService.deveExibirModalLogin(novoContador);
+      if (modalInfo.exibirModal) {
+        setShowLoginModal(true);
+        return true;
+      }
+    }
+
+    return false;
+  }, [user, questoesRespondidas, questoesService])
+
+  // Fechar modal
+  const fecharModal = useCallback(() => {
+    setShowLoginModal(false)
+  }, [])
+
+  // Resetar contador após login
+  const resetarContador = useCallback(() => {
+    setQuestoesRespondidas(0)
+    setShowLoginModal(false)
+  }, [])
+
+  // Executar reset quando usuário fizer login
+  useEffect(() => {
+    if (user) {
+      resetarContador()
+    }
+  }, [user, resetarContador])
+
+  // Obter informações do modal
+  const getInfoModal = useCallback(async () => {
+    return await questoesService.deveExibirModalLogin(questoesRespondidas)
+  }, [questoesService, questoesRespondidas])
+
   const salvarResultado = useCallback(async (
     questoesSimulado: QuestaoCompleta[],
     respostas: { [key: number]: string },
@@ -110,7 +207,7 @@ export function useQuestoes(cargoId: number = 1) {
     }
 
     try {
-      console.log(`💾 Salvando resultado do simulado...`, {
+      console.log(`Salvando resultado do simulado...`, {
         userId: user.id,
         cargoId,
         totalQuestoes: questoesSimulado.length,
@@ -126,56 +223,47 @@ export function useQuestoes(cargoId: number = 1) {
         tempoGasto
       )
       
-      console.log(`✅ Resultado salvo com ID: ${simuladoId}`)
+      console.log(`Resultado salvo com ID: ${simuladoId}`)
       return simuladoId
     } catch (err) {
-      console.error('❌ Erro ao salvar resultado:', err)
+      console.error('Erro ao salvar resultado:', err)
       throw new Error('Erro ao salvar resultado')
     }
   }, [user, cargoId, questoesService])
 
-  // Buscar estatísticas do usuário
   const carregarEstatisticas = useCallback(async (): Promise<AreaEstatistica[]> => {
     if (!user) {
-      console.log('👤 Usuário não logado, retornando estatísticas vazias')
+      console.log('Usuário não logado, retornando estatísticas vazias')
       return []
     }
     
     try {
-      console.log(`📈 Carregando estatísticas para usuário ${user.id}...`)
+      console.log(`Carregando estatísticas para usuário ${user.id}...`)
       
       const stats = await questoesService.buscarEstatisticasUsuario(user.id, cargoId)
       
-      console.log(`✅ Estatísticas carregadas:`, stats.map(s => ({
-        area: s.nome,
-        acertos: s.acertos,
-        total: s.total_questoes,
-        percentual: s.percentual.toFixed(1) + '%'
-      })))
-      
+      console.log(`Estatísticas carregadas`)
       return stats
     } catch (err) {
-      console.error('❌ Erro ao carregar estatísticas:', err)
+      console.error('Erro ao carregar estatísticas:', err)
       return []
     }
   }, [user, cargoId, questoesService])
 
-  // Função para buscar questões por área específica
   const buscarQuestoesPorArea = useCallback(async (areaId: number, limite?: number): Promise<QuestaoCompleta[]> => {
     try {
-      console.log(`🔍 Buscando questões da área ${areaId}...`)
+      console.log(`Buscando questões da área ${areaId}...`)
       
       const questoesDaArea = await questoesService.buscarQuestoesPorArea(cargoId, areaId, limite)
       
-      console.log(`✅ ${questoesDaArea.length} questões encontradas para a área`)
+      console.log(`${questoesDaArea.length} questões encontradas para a área`)
       return questoesDaArea
     } catch (err) {
-      console.error('❌ Erro ao buscar questões por área:', err)
+      console.error('Erro ao buscar questões por área:', err)
       throw new Error('Erro ao buscar questões da área')
     }
   }, [cargoId, questoesService])
 
-  // Estatísticas computadas
   const estatisticas = useMemo(() => {
     if (questoes.length === 0) return null
 
@@ -184,10 +272,18 @@ export function useQuestoes(cargoId: number = 1) {
       return acc
     }, {} as Record<string, number>)
 
+    // Estatísticas por dificuldade
+    const totalPorDificuldade = questoes.reduce((acc, q) => {
+      const nivel = `Nível ${q.dificuldade}`
+      acc[nivel] = (acc[nivel] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+
     return {
       totalQuestoes: questoes.length,
       totalAreas: areas.length,
       questoesPorArea: totalPorArea,
+      questoesPorDificuldade: totalPorDificuldade,
       areasDisponiveis: areas.map(a => ({
         id: a.id,
         nome: a.nome,
@@ -197,36 +293,7 @@ export function useQuestoes(cargoId: number = 1) {
     }
   }, [questoes, areas])
 
-  // Estado de validação
   const isReady = !loading && questoes.length > 0 && areas.length > 0
-
-  // 🔍 DEBUG INFO EXPANDIDO
-  const debug = useMemo(() => ({
-    cargoId,
-    totalQuestoes: questoes.length,
-    totalAreas: areas.length,
-    lastCargoId,
-    loading,
-    error,
-    isReady,
-    // Informações detalhadas para debug
-    questoesPorArea: questoes.reduce((acc, q) => {
-      acc[q.area_nome] = (acc[q.area_nome] || 0) + 1
-      return acc
-    }, {} as Record<string, number>),
-    areasConfiguradas: areas.map(a => ({
-      id: a.id,
-      nome: a.nome,
-      questoesConfiguradas: a.total_questoes,
-      peso: a.peso
-    })),
-    // Amostra das primeiras questões
-    amostraQuestoes: questoes.slice(0, 2).map(q => ({
-      id: q.id,
-      area: q.area_nome,
-      enunciado: q.enunciado.substring(0, 50) + '...'
-    }))
-  }), [cargoId, questoes, areas, lastCargoId, loading, error, isReady])
 
   return {
     // Estados principais
@@ -236,17 +303,38 @@ export function useQuestoes(cargoId: number = 1) {
     error,
     isReady,
     
+    // Estados do modal
+    questoesRespondidas,
+    showLoginModal,
+    
     // Estatísticas
     estatisticas,
     
     // Ações
     gerarSimulado,
+    gerarSimuladoPorArea, // NOVO MÉTODO
     salvarResultado,
     carregarEstatisticas,
     buscarQuestoesPorArea,
     recarregar: () => carregarQuestoes(true),
     
-    // Debug expandido
-    debug
+    // Ações do modal
+    registrarQuestaoRespondida,
+    fecharModal,
+    resetarContador,
+    getInfoModal,
+    
+    // Debug
+    debug: {
+      cargoId,
+      totalQuestoes: questoes.length,
+      totalAreas: areas.length,
+      lastCargoId,
+      loading,
+      error,
+      isReady,
+      questoesRespondidas,
+      showLoginModal,
+    }
   }
 }

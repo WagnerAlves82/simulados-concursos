@@ -1,3 +1,4 @@
+// src/lib/questoesServices.ts - VERSÃO CORRIGIDA
 import { createClient } from '@/lib/supabase';
 import { Database } from '@/lib/types';
 
@@ -20,8 +21,21 @@ export interface AreaEstatistica {
   percentual: number;
 }
 
+// CONFIGURAÇÃO DO LIMITE GRATUITO
+const LIMITE_QUESTOES_GRATUITAS = 3;
+
 export class QuestoesService {
   private supabase = createClient();
+
+  // Método auxiliar para verificar login
+  private async isUsuarioLogado(): Promise<boolean> {
+    try {
+      const { data: { user }, error } = await this.supabase.auth.getUser();
+      return !error && !!user;
+    } catch (error) {
+      return false;
+    }
+  }
 
   async buscarQuestoesPorCargo(cargoId: number): Promise<{
     questoes: QuestaoCompleta[];
@@ -33,7 +47,7 @@ export class QuestoesService {
     try {
       console.log('Iniciando busca por cargoId:', cargoId);
       
-      // 1. Buscar questões básicas
+      // 1. Buscar TODAS as questões
       const { data: questoes, error: questoesError } = await this.supabase
         .from('questoes')
         .select('*')
@@ -54,76 +68,65 @@ export class QuestoesService {
 
       console.log(`Questões encontradas: ${questoes.length}`);
 
-      // 2. Buscar TODAS as áreas disponíveis primeiro
-      const { data: todasAreas, error: todasAreasError } = await this.supabase
-        .from('areas_conhecimento')
-        .select('*')
-        .order('id');
-
-      if (todasAreasError) {
-        console.error('Erro ao buscar todas as áreas:', todasAreasError);
-      }
-
-      console.log(`Total de áreas no banco: ${todasAreas?.length || 0}`);
-
-      // 3. Buscar apenas áreas usadas pelas questões
+      // 2. Buscar áreas - CORRIGIDO (evita problema com .in())
       const areaIds = [...new Set(questoes.map(q => q.area_id).filter(id => id !== null))];
-      console.log('Area IDs usados pelas questões:', areaIds);
-
+      console.log('Area IDs a buscar:', areaIds);
+      
       const { data: areas, error: areasError } = await this.supabase
         .from('areas_conhecimento')
-        .select('*')
-        .in('id', areaIds);
+        .select('*');
 
+      // Filtrar apenas as áreas que têm questões
+      const areasComQuestoes = areas?.filter(area => areaIds.includes(area.id)) || [];
+
+      // ADICIONAR verificação de erro:
       if (areasError) {
-        console.error('Erro na query de areas_conhecimento:', areasError);
-        // Não quebrar aqui, continuar sem áreas
+        console.error('Erro ao buscar áreas:', areasError);
+        throw new Error(`Erro ao buscar áreas: ${areasError.message}`);
       }
 
-      console.log(`Áreas encontradas para as questões: ${areas?.length || 0}`);
+      console.log('Todas as áreas do banco:', areas);
+      console.log('Áreas filtradas com questões:', areasComQuestoes);
 
-      // 4. Buscar configurações de cargo_areas
       const { data: cargoAreas, error: cargoAreasError } = await this.supabase
         .from('cargo_areas')
         .select('*')
         .eq('cargo_id', cargoId);
 
       if (cargoAreasError) {
-        console.error('Erro na query de cargo_areas:', cargoAreasError);
-        // Não quebrar aqui, continuar sem configuração
+        console.warn('Erro ao buscar cargo_areas:', cargoAreasError);
       }
 
-      console.log(`Configurações cargo_areas encontradas: ${cargoAreas?.length || 0}`);
-
-      // 5. Criar mapas para relacionamento (com fallbacks seguros)
-      const areaMap = areas?.reduce((acc, area) => {
+      // 3. Criar mapas para relacionamento - CORRIGIDO
+      const areaMap = (areas && areas.length > 0) ? areas.reduce((acc, area) => {
         acc[area.id] = area.nome;
         return acc;
-      }, {} as { [key: number]: string }) || {};
+      }, {} as { [key: number]: string }) : {};
+
+      console.log('Area map criado:', areaMap);
 
       const cargoAreaMap = cargoAreas?.reduce((acc, ca) => {
-        acc[ca.area_id] = {
+        acc[ca.area_id!] = {
           numero_questoes: ca.numero_questoes,
           peso: ca.peso || 1.0
         };
         return acc;
       }, {} as { [key: number]: { numero_questoes: number; peso: number } }) || {};
 
-      // 6. Montar questões completas
+      // 4. Montar questões completas - CORRIGIDO
       const questoesCompletas: QuestaoCompleta[] = questoes.map(q => ({
         ...q,
-        area_nome: areaMap[q.area_id] || `Área ${q.area_id}` || 'Área Desconhecida',
-        peso_area: cargoAreaMap[q.area_id]?.peso || 1.0
+        area_nome: areaMap[q.area_id!] || 'Área Desconhecida',
+        peso_area: cargoAreaMap[q.area_id!]?.peso || 1.0
       }));
 
-      // 7. Montar estatísticas das áreas (usando areas reais OU criando básicas)
+      // 5. Montar estatísticas das áreas - CORRIGIDO
       let areasEstatisticas: AreaEstatistica[];
 
       if (cargoAreas && cargoAreas.length > 0) {
-        // Usar configuração completa
         areasEstatisticas = cargoAreas.map(ca => ({
-          id: ca.area_id,
-          nome: areaMap[ca.area_id] || `Área ${ca.area_id}`,
+          id: ca.area_id!,
+          nome: areaMap[ca.area_id!] || 'Área Desconhecida',
           total_questoes: ca.numero_questoes,
           peso: ca.peso || 1.0,
           questoes_respondidas: 0,
@@ -131,12 +134,11 @@ export class QuestoesService {
           percentual: 0
         }));
       } else {
-        // Criar áreas básicas baseadas nas questões existentes
         areasEstatisticas = areaIds.map(areaId => {
           const questoesDaArea = questoes.filter(q => q.area_id === areaId);
           return {
-            id: areaId,
-            nome: areaMap[areaId] || `Área ${areaId}`,
+            id: areaId!,
+            nome: areaMap[areaId!] || 'Área Desconhecida',
             total_questoes: questoesDaArea.length,
             peso: 1.0,
             questoes_respondidas: 0,
@@ -151,7 +153,7 @@ export class QuestoesService {
       return {
         questoes: questoesCompletas,
         areas: areasEstatisticas,
-        total: questoesCompletas.length
+        total: questoes.length
       };
 
     } catch (error) {
@@ -161,11 +163,221 @@ export class QuestoesService {
   }
 
   /**
+   * Gera um simulado personalizado baseado na distribuição por área e dificuldade
+   */
+  async gerarSimuladoPersonalizado(
+    cargoId: number, 
+    dificuldades: number[] = [1, 2, 3] // Níveis de dificuldade a incluir
+  ): Promise<QuestaoCompleta[]> {
+    try {
+      console.log('Iniciando geração do simulado para cargo:', cargoId, 'dificuldades:', dificuldades);
+      
+      // 1. Buscar TODAS as questões do cargo com filtro de dificuldade
+      const { data: todasQuestoes, error: questoesError } = await this.supabase
+        .from('questoes')
+        .select('*')
+        .eq('cargo_id', cargoId)
+        .eq('ativo', true)
+        .in('dificuldade', dificuldades);
+
+      if (questoesError) {
+        console.error('Erro ao buscar questões:', questoesError);
+        throw new Error(questoesError.message);
+      }
+
+      if (!todasQuestoes || todasQuestoes.length === 0) {
+        console.warn('Nenhuma questão encontrada para o cargo e dificuldades especificadas');
+        return [];
+      }
+
+      console.log(`Total de questões disponíveis: ${todasQuestoes.length}`);
+
+      // 2. Buscar configuração de cargo_areas
+      const { data: cargoAreas, error: configError } = await this.supabase
+        .from('cargo_areas')
+        .select('area_id, numero_questoes')
+        .eq('cargo_id', cargoId);
+
+      if (configError) {
+        console.error('Erro ao buscar configuração:', configError);
+      }
+
+      console.log(`Configurações encontradas: ${cargoAreas?.length || 0}`);
+
+      // 3. Buscar dados complementares para questões completas - CORRIGIDO
+      const areaIds = [...new Set(todasQuestoes.map(q => q.area_id).filter(id => id !== null))];
+      
+      const { data: areas, error: areasError } = await this.supabase
+        .from('areas_conhecimento')
+        .select('*');
+
+      // Filtrar apenas as áreas necessárias
+      const areasComQuestoes = areas?.filter(area => areaIds.includes(area.id)) || [];
+
+      if (areasError) {
+        console.error('Erro ao buscar áreas para simulado:', areasError);
+      }
+
+      const { data: configAreas } = await this.supabase
+        .from('cargo_areas')
+        .select('*')
+        .eq('cargo_id', cargoId);
+
+      // Criar mapas - CORRIGIDO
+      const areaMap = (areasComQuestoes && areasComQuestoes.length > 0) ? areasComQuestoes.reduce((acc, area) => {
+        acc[area.id] = area.nome;
+        return acc;
+      }, {} as { [key: number]: string }) : {};
+
+      const pesoMap = configAreas?.reduce((acc, config) => {
+        acc[config.area_id!] = config.peso || 1.0;
+        return acc;
+      }, {} as { [key: number]: number }) || {};
+
+      // Montar questões completas - CORRIGIDO
+      const questoesCompletas: QuestaoCompleta[] = todasQuestoes.map(q => ({
+        ...q,
+        area_nome: areaMap[q.area_id!] || 'Área Desconhecida',
+        peso_area: pesoMap[q.area_id!] || 1.0
+      }));
+
+      let questoesSimulado: QuestaoCompleta[] = [];
+
+      // 4. Se não há configuração, usar distribuição simples com mistura de dificuldades
+      if (!cargoAreas || cargoAreas.length === 0) {
+        console.log('Sem configuração específica, misturando questões por dificuldade');
+        
+        // Separar questões por dificuldade
+        const questoesPorDificuldade = dificuldades.reduce((acc, nivel) => {
+          acc[nivel] = questoesCompletas.filter(q => q.dificuldade === nivel);
+          return acc;
+        }, {} as { [key: number]: QuestaoCompleta[] });
+
+        // Calcular quantas questões de cada dificuldade incluir
+        const totalDesejado = Math.min(120, questoesCompletas.length);
+        const questoesPorNivel = Math.floor(totalDesejado / dificuldades.length);
+        const resto = totalDesejado % dificuldades.length;
+
+        dificuldades.forEach((nivel, index) => {
+          const quantidade = questoesPorNivel + (index < resto ? 1 : 0);
+          const disponíveis = questoesPorDificuldade[nivel] || [];
+          const embaralhadas = this.embaralharArray(disponíveis);
+          questoesSimulado.push(...embaralhadas.slice(0, quantidade));
+        });
+
+        questoesSimulado = this.embaralharArray(questoesSimulado);
+      } else {
+        // 5. Usar configuração específica por área, misturando dificuldades dentro de cada área
+        for (const config of cargoAreas) {
+          const questoesDaArea = questoesCompletas.filter(q => q.area_id === config.area_id);
+          console.log(`Área ${config.area_id}: ${questoesDaArea.length} questões disponíveis, ${config.numero_questoes} solicitadas`);
+          
+          if (questoesDaArea.length > 0) {
+            // Separar por dificuldade dentro da área
+            const questoesPorDificuldade = dificuldades.reduce((acc, nivel) => {
+              acc[nivel] = questoesDaArea.filter(q => q.dificuldade === nivel);
+              return acc;
+            }, {} as { [key: number]: QuestaoCompleta[] });
+
+            // Distribuir questões da área proporcionalmente entre dificuldades
+            const questoesDaAreaSelecionadas: QuestaoCompleta[] = [];
+            const questoesPorNivel = Math.floor(config.numero_questoes / dificuldades.length);
+            const resto = config.numero_questoes % dificuldades.length;
+
+            dificuldades.forEach((nivel, index) => {
+              const quantidade = questoesPorNivel + (index < resto ? 1 : 0);
+              const disponíveis = questoesPorDificuldade[nivel] || [];
+              const embaralhadas = this.embaralharArray(disponíveis);
+              questoesDaAreaSelecionadas.push(...embaralhadas.slice(0, quantidade));
+            });
+
+            questoesSimulado.push(...questoesDaAreaSelecionadas);
+            console.log(`Selecionadas ${questoesDaAreaSelecionadas.length} questões da área ${config.area_id}`);
+          }
+        }
+
+        questoesSimulado = this.embaralharArray(questoesSimulado);
+      }
+
+      const simuladoFinal = questoesSimulado;
+      
+      console.log(`Simulado final gerado: ${simuladoFinal.length} questões`);
+      console.log('Distribuição por área:', 
+        simuladoFinal.reduce((acc, q) => {
+          acc[q.area_nome] = (acc[q.area_nome] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>)
+      );
+
+      return simuladoFinal;
+
+    } catch (error) {
+      console.error('Erro ao gerar simulado:', error);
+      throw error;
+    }
+  }
+
+  // Método para verificar se usuário deve ver modal
+  async deveExibirModalLogin(questoesRespondidas: number): Promise<{
+    exibirModal: boolean;
+    beneficios: string[];
+    questoesTotais: number;
+    questoesLiberadas: number;
+  }> {
+    const isLogado = await this.isUsuarioLogado();
+    
+    if (isLogado || questoesRespondidas < LIMITE_QUESTOES_GRATUITAS) {
+      return {
+        exibirModal: false,
+        beneficios: [],
+        questoesTotais: 0,
+        questoesLiberadas: 0
+      };
+    }
+
+    return {
+      exibirModal: true,
+      beneficios: [
+        "Acesso completo a todas as questões do simulado",
+        "Relatórios detalhados de desempenho por área",
+        "Cronômetro e controle de tempo personalizado",
+        "Acompanhamento de evolução e estatísticas",
+        "Histórico completo de simulados realizados",
+        "Questões sempre atualizadas conforme o edital",
+        "Sincronização entre dispositivos",
+        "Comentários detalhados com explicações das regras"
+      ],
+      questoesTotais: 0,
+      questoesLiberadas: LIMITE_QUESTOES_GRATUITAS
+    };
+  }
+
+  async testarConexao() {
+    try {
+      console.log('Testando conexão com Supabase...');
+      const { data, error } = await this.supabase
+        .from('questoes')
+        .select('id')
+        .limit(1);
+      
+      if (error) {
+        console.error('Erro de conexão:', error);
+        throw error;
+      }
+      
+      console.log('Conexão bem-sucedida');
+      return true;
+    } catch (error) {
+      console.error('Erro geral na conexão:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Busca questões de uma área específica
    */
   async buscarQuestoesPorArea(cargoId: number, areaId: number, limite?: number): Promise<QuestaoCompleta[]> {
     try {
-      // 1. Buscar questões
       let questoesQuery = this.supabase
         .from('questoes')
         .select('*')
@@ -185,7 +397,7 @@ export class QuestoesService {
         return [];
       }
 
-      // 2. Buscar nome da área
+      // Buscar nome da área - CORRIGIDO
       const { data: area, error: areaError } = await this.supabase
         .from('areas_conhecimento')
         .select('nome')
@@ -196,7 +408,7 @@ export class QuestoesService {
         console.warn('Erro ao buscar nome da área:', areaError);
       }
 
-      // 3. Buscar peso da área
+      // Buscar peso da área
       const { data: cargoArea, error: cargoAreaError } = await this.supabase
         .from('cargo_areas')
         .select('peso')
@@ -208,7 +420,7 @@ export class QuestoesService {
         console.warn('Erro ao buscar configuração da área:', cargoAreaError);
       }
 
-      // 4. Montar questões completas
+      // Montar questões completas - CORRIGIDO
       const questoesCompletas: QuestaoCompleta[] = questoes.map(q => ({
         ...q,
         area_nome: area?.nome || 'Área Desconhecida',
@@ -224,175 +436,11 @@ export class QuestoesService {
   }
 
   /**
-   * Gera um simulado personalizado baseado na distribuição por área
-   */
- /**
-   * Gera um simulado personalizado baseado na distribuição por área
-   */
-  async gerarSimuladoPersonalizado(cargoId: number): Promise<QuestaoCompleta[]> {
-    try {
-      console.log('🎯 Iniciando geração do simulado para cargo:', cargoId);
-      
-      // 1. Buscar TODAS as questões do cargo primeiro
-      const { data: todasQuestoes, error: questoesError } = await this.supabase
-        .from('questoes')
-        .select('*')
-        .eq('cargo_id', cargoId)
-        .eq('ativo', true);
-
-      if (questoesError) {
-        console.error('Erro ao buscar questões:', questoesError);
-        throw new Error(questoesError.message);
-      }
-
-      if (!todasQuestoes || todasQuestoes.length === 0) {
-        console.warn('Nenhuma questão encontrada para o cargo');
-        return [];
-      }
-
-      console.log(`📚 Total de questões disponíveis: ${todasQuestoes.length}`);
-
-      // 2. Buscar configuração de cargo_areas
-      const { data: cargoAreas, error: configError } = await this.supabase
-        .from('cargo_areas')
-        .select('area_id, numero_questoes')
-        .eq('cargo_id', cargoId);
-
-      if (configError) {
-        console.error('Erro ao buscar configuração:', configError);
-      }
-
-      console.log(`⚙️ Configurações encontradas: ${cargoAreas?.length || 0}`);
-
-      // 3. Se não há configuração, usar distribuição simples
-      if (!cargoAreas || cargoAreas.length === 0) {
-        console.log('📋 Sem configuração específica, usando todas as questões embaralhadas');
-        
-        // Buscar nomes das áreas
-        const areaIds = [...new Set(todasQuestoes.map(q => q.area_id))];
-        const { data: areas } = await this.supabase
-          .from('areas_conhecimento')
-          .select('*')
-          .in('id', areaIds);
-
-        const areaMap = areas?.reduce((acc, area) => {
-          acc[area.id] = area.nome;
-          return acc;
-        }, {} as { [key: number]: string }) || {};
-
-        const questoesCompletas: QuestaoCompleta[] = todasQuestoes.map(q => ({
-          ...q,
-          area_nome: areaMap[q.area_id] || `Área ${q.area_id}`,
-          peso_area: 1.0
-        }));
-
-        // Embaralhar e retornar até 120 questões
-        const embaralhadas = this.embaralharArray(questoesCompletas);
-        const simuladoFinal = embaralhadas.slice(0, 120);
-        
-        console.log(`✅ Simulado gerado sem configuração: ${simuladoFinal.length} questões`);
-        return simuladoFinal;
-      }
-
-      // 4. Usar configuração específica por área
-      const { data: areas } = await this.supabase
-        .from('areas_conhecimento')
-        .select('*');
-
-      const { data: configAreas } = await this.supabase
-        .from('cargo_areas')
-        .select('*')
-        .eq('cargo_id', cargoId);
-
-      // Criar mapas
-      const areaMap = areas?.reduce((acc, area) => {
-        acc[area.id] = area.nome;
-        return acc;
-      }, {} as { [key: number]: string }) || {};
-
-      const pesoMap = configAreas?.reduce((acc, config) => {
-        acc[config.area_id] = config.peso || 1.0;
-        return acc;
-      }, {} as { [key: number]: number }) || {};
-
-      // Montar questões completas
-      const questoesCompletas: QuestaoCompleta[] = todasQuestoes.map(q => ({
-        ...q,
-        area_nome: areaMap[q.area_id] || `Área ${q.area_id}`,
-        peso_area: pesoMap[q.area_id] || 1.0
-      }));
-
-      // Selecionar questões por área conforme configuração
-      const questoesSimulado: QuestaoCompleta[] = [];
-      
-      for (const config of cargoAreas) {
-        const questoesDaArea = questoesCompletas.filter(q => q.area_id === config.area_id);
-        console.log(`📊 Área ${config.area_id}: ${questoesDaArea.length} questões disponíveis, ${config.numero_questoes} solicitadas`);
-        
-        if (questoesDaArea.length > 0) {
-          const questoesEmbaralhadas = this.embaralharArray(questoesDaArea);
-          const questoesSelecionadas = questoesEmbaralhadas.slice(0, config.numero_questoes);
-          questoesSimulado.push(...questoesSelecionadas);
-          
-          console.log(`✅ Selecionadas ${questoesSelecionadas.length} questões da área ${config.area_id}`);
-        } else {
-          console.warn(`⚠️ Nenhuma questão encontrada para área ${config.area_id}`);
-        }
-      }
-
-      const simuladoFinal = this.embaralharArray(questoesSimulado);
-      
-      console.log(`🎉 Simulado final gerado: ${simuladoFinal.length} questões`);
-      console.log('📋 Distribuição por área:', 
-        simuladoFinal.reduce((acc, q) => {
-          acc[q.area_nome] = (acc[q.area_nome] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>)
-      );
-
-      return simuladoFinal;
-
-    } catch (error) {
-      console.error('❌ Erro ao gerar simulado:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Testa a conexão com o Supabase
-   */
-  async testarConexao() {
-    try {
-      console.log('Testando conexão com Supabase...');
-      const { data, error } = await this.supabase
-        .from('questoes')
-        .select('id')
-        .limit(1);
-      
-      if (error) {
-        console.error('Erro de conexão:', {
-          message: error.message,
-          code: error.code,
-          details: error.details,
-          hint: error.hint
-        });
-        throw error;
-      }
-      
-      console.log('Conexão bem-sucedida, dados retornados:', data);
-      return true;
-    } catch (error) {
-      console.error('Erro geral na conexão:', error);
-      throw error;
-    }
-  }
-
-  /**
    * Busca estatísticas de desempenho por área para um usuário
    */
   async buscarEstatisticasUsuario(userId: string, cargoId: number): Promise<AreaEstatistica[]> {
     try {
-      // 1. Buscar estatísticas
+      // Buscar estatísticas
       const { data: stats, error: statsError } = await this.supabase
         .from('estatisticas_areas')
         .select('*')
@@ -402,8 +450,8 @@ export class QuestoesService {
       if (statsError) throw new Error(statsError.message);
       if (!stats || stats.length === 0) return [];
 
-      // 2. Buscar nomes das áreas
-      const areaIds = stats.map(s => s.area_id);
+      // Buscar nomes das áreas - CORRIGIDO
+      const areaIds = stats.map(s => s.area_id).filter(id => id !== null);
       const { data: areas, error: areasError } = await this.supabase
         .from('areas_conhecimento')
         .select('*')
@@ -413,7 +461,7 @@ export class QuestoesService {
         console.warn('Erro ao buscar áreas:', areasError);
       }
 
-      // 3. Buscar pesos das áreas
+      // Buscar pesos das áreas
       const { data: cargoAreas, error: cargoAreasError } = await this.supabase
         .from('cargo_areas')
         .select('*')
@@ -424,23 +472,23 @@ export class QuestoesService {
         console.warn('Erro ao buscar configuração das áreas:', cargoAreasError);
       }
 
-      // 4. Criar mapas
-      const areaMap = areas?.reduce((acc, area) => {
+      // Criar mapas - CORRIGIDO
+      const areaMap = (areas && areas.length > 0) ? areas.reduce((acc, area) => {
         acc[area.id] = area.nome;
         return acc;
-      }, {} as { [key: number]: string }) || {};
+      }, {} as { [key: number]: string }) : {};
 
       const pesoMap = cargoAreas?.reduce((acc, config) => {
-        acc[config.area_id] = config.peso || 1.0;
+        acc[config.area_id!] = config.peso || 1.0;
         return acc;
       }, {} as { [key: number]: number }) || {};
 
-      // 5. Montar estatísticas
+      // Montar estatísticas - CORRIGIDO
       return stats.map(s => ({
-        id: s.area_id,
-        nome: areaMap[s.area_id] || 'Área Desconhecida',
+        id: s.area_id!,
+        nome: areaMap[s.area_id!] || 'Área Desconhecida',
         total_questoes: s.total_questoes || 0,
-        peso: pesoMap[s.area_id] || 1.0,
+        peso: pesoMap[s.area_id!] || 1.0,
         questoes_respondidas: s.total_questoes || 0,
         acertos: s.acertos || 0,
         percentual: s.percentual || 0
@@ -500,7 +548,7 @@ export class QuestoesService {
         ordem: index + 1,
         resposta_usuario: respostas[q.id] || null,
         correta: respostas[q.id] === q.resposta_correta,
-        tempo_resposta: Math.floor(tempoGasto / questoes.length) // Estimativa
+        tempo_resposta: Math.floor(tempoGasto / questoes.length)
       }));
 
       const { error: questoesError } = await this.supabase
@@ -528,10 +576,10 @@ export class QuestoesService {
     respostas: { [key: number]: string }
   ) {
     const questoesPorArea = questoes.reduce((acc, q) => {
-      if (!acc[q.area_id]) {
-        acc[q.area_id] = [];
+      if (!acc[q.area_id!]) {
+        acc[q.area_id!] = [];
       }
-      acc[q.area_id].push(q);
+      acc[q.area_id!].push(q);
       return acc;
     }, {} as { [key: number]: QuestaoCompleta[] });
 
@@ -549,8 +597,8 @@ export class QuestoesService {
         .single();
 
       if (estatisticaExistente) {
-        const novoTotal = estatisticaExistente.total_questoes + total;
-        const novosAcertos = estatisticaExistente.acertos + acertos;
+        const novoTotal = (estatisticaExistente.total_questoes || 0) + total;
+        const novosAcertos = (estatisticaExistente.acertos || 0) + acertos;
         const novoPercentual = (novosAcertos / novoTotal) * 100;
 
         await this.supabase
@@ -579,9 +627,6 @@ export class QuestoesService {
     }
   }
 
-  /**
-   * Função auxiliar para embaralhar array
-   */
   private embaralharArray<T>(array: T[]): T[] {
     const embaralhado = [...array];
     for (let i = embaralhado.length - 1; i > 0; i--) {
