@@ -324,24 +324,26 @@ useEffect(() => {
   }
 
   // Componente de header com auth
-  const AuthHeader = () => (
-    <header className="container mx-auto px-4 py-6">
-      <nav className="flex items-center justify-between">
+const AuthHeader = () => (
+  <header className="container mx-auto px-4 py-6">
+    <nav className="space-y-4">
+      {/* Primeira linha: Logo e ações de usuário */}
+      <div className="flex items-center justify-between">
         <Link href="/" className="flex items-center space-x-2">
           <BookOpen className="h-8 w-8 text-blue-600" />
           <h1 className="text-2xl font-bold text-gray-900">SimuladosPro</h1>
         </Link>
         
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-2 md:space-x-4">
           {user ? (
             <>
-              <div className="flex items-center space-x-2 text-sm text-gray-600">
+              <div className="hidden sm:flex items-center space-x-2 text-sm text-gray-600">
                 <User className="h-4 w-4" />
-                <span>{profile?.nome || user.email}</span>
+                <span className="hidden md:inline">{profile?.nome || user.email}</span>
               </div>
               <Button variant="outline" onClick={handleLogout}>
                 <LogOut className="h-4 w-4 mr-2" />
-                Sair
+                <span className="hidden sm:inline">Sair</span>
               </Button>
             </>
           ) : (
@@ -351,17 +353,21 @@ useEffect(() => {
               </Button>
             </Link>
           )}
-          
-          <Link href="/">
-            <Button variant="outline">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Voltar ao Início
-            </Button>
-          </Link>
         </div>
-      </nav>
-    </header>
-  );
+      </div>
+
+      {/* Segunda linha: Navegação */}
+      <div className="flex justify-left">
+        <Link href="/">
+          <Button variant="outline" size="sm">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Voltar ao Início
+          </Button>
+        </Link>
+      </div>
+    </nav>
+  </header>
+);
 
   // Tela inicial
   if (!isStarted) {
@@ -558,7 +564,7 @@ useEffect(() => {
                 {tipoSimulado === 'completo' ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {areas.map(area => (
-                      <div key={area.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                      <div key={area.id} className="flex justify-between items-left p-3 bg-gray-50 rounded-lg">
                         <span className="font-medium">{area.nome}</span>
                         <Badge variant="outline">{area.total_questoes} questões</Badge>
                       </div>
@@ -697,8 +703,8 @@ useEffect(() => {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
         <AuthHeader />
         
-        <div className="container mx-auto px-4 py-8">
-          <div className="max-w-4xl mx-auto">
+        <div className="container mx-auto px-2 md:px-4 py-4 md:py-8">
+        <div className="max-w-4xl mx-auto">
             <Card className="mb-8">
               <CardHeader>
                 <CardTitle className="text-2xl text-center">Resultado do Simulado</CardTitle>
@@ -774,74 +780,81 @@ useEffect(() => {
       />
 
       {/* Header fixo */}
-      <header className="bg-white shadow-sm border-b sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Link href="/" className="flex items-center space-x-2">
-                <BookOpen className="h-6 w-6 text-blue-600" />
-                <span className="font-bold text-gray-900">SimuladosPro</span>
-              </Link>
-              <Badge variant="outline">
-                Questão {currentQuestion + 1} de {questoesSimulado.length}
-              </Badge>
-              {/* NOVO: Mostrar estatísticas em tempo real para estudo por área */}
-              {tipoSimulado === 'area' && (
-                <Badge variant="secondary">
-                  Acertos: {Object.keys(answers).filter(id => 
-                    answers[parseInt(id)] === questoesSimulado.find(q => q.id === parseInt(id))?.resposta_correta
-                  ).length}/{Object.keys(answers).length}
-                </Badge>
-              )}
-              {user && (
-                <div className="flex items-center space-x-1 text-sm text-gray-600">
-                  <User className="h-4 w-4" />
-                  <span>{profile?.nome || user.email}</span>
-                </div>
-              )}
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <Clock className="h-5 w-5 text-gray-600" />
-                <span className="font-mono text-lg font-semibold">
-                  {formatTime(timeLeft)}
-                </span>
-                <Button
-                  onClick={() => setIsRunning(!isRunning)}
-                  variant="outline"
-                  size="sm"
-                >
-                  {isRunning ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                </Button>
-              </div>
-              
-              {user && (
-                <Button variant="outline" size="sm" onClick={handleLogout}>
-                  <LogOut className="h-4 w-4 mr-1" />
-                  Sair
-                </Button>
-              )}
-              
-              <Button onClick={handleFinish} variant="destructive">
-                Finalizar
-              </Button>
-            </div>
-          </div>
-          
-          {/* Barra de progresso */}
-          <div className="mt-4">
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${((currentQuestion + 1) / questoesSimulado.length) * 100}%` }}
-              ></div>
-            </div>
-          </div>
-        </div>
-      </header>
+<header className="bg-white shadow-sm border-b sticky top-0 z-10">
+  <div className="container mx-auto px-4 py-3">
+    {/* Primeira linha: Logo e botões principais */}
+    <div className="flex items-center justify-between mb-2">
+      <Link href="/" className="flex items-center space-x-2">
+        <BookOpen className="h-6 w-6 text-blue-600" />
+        <span className="font-bold text-gray-900">SimuladosPro</span>
+      </Link>
+      
+      <div className="flex items-center space-x-2">
+        {user && (
+          <Button variant="outline" size="sm" onClick={handleLogout}>
+            <LogOut className="h-4 w-4 mr-1" />
+            <span className="hidden sm:inline">Sair</span>
+          </Button>
+        )}
+        
+        <Button onClick={handleFinish} variant="destructive" size="sm">
+          <span className="hidden sm:inline">Finalizar</span>
+          <span className="sm:hidden">Fim</span>
+        </Button>
+      </div>
+    </div>
 
-      <div className="container mx-auto px-4 py-8">
+    {/* Segunda linha: Informações do simulado */}
+    <div className="flex items-center justify-between text-sm">
+      <div className="flex items-center space-x-2 md:space-x-3">
+        <Badge variant="outline" className="text-xs">
+          Questão {currentQuestion + 1} de {questoesSimulado.length}
+        </Badge>
+        
+        {tipoSimulado === 'area' && (
+          <Badge variant="secondary" className="text-xs">
+            Acertos: {Object.keys(answers).filter(id => 
+              answers[parseInt(id)] === questoesSimulado.find(q => q.id === parseInt(id))?.resposta_correta
+            ).length}/{Object.keys(answers).length}
+          </Badge>
+        )}
+        
+        {user && (
+          <div className="hidden md:flex items-center space-x-1 text-gray-600">
+            <User className="h-4 w-4" />
+            <span>{profile?.nome || user.email}</span>
+          </div>
+        )}
+      </div>
+      
+      <div className="flex items-center space-x-2">
+        <Clock className="h-4 w-4 text-gray-600" />
+        <span className="font-mono text-sm md:text-base font-semibold">
+          {formatTime(timeLeft)}
+        </span>
+        <Button
+          onClick={() => setIsRunning(!isRunning)}
+          variant="outline"
+          size="sm"
+        >
+          {isRunning ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+        </Button>
+      </div>
+    </div>
+    
+    {/* Barra de progresso */}
+    <div className="mt-3">
+      <div className="w-full bg-gray-200 rounded-full h-2">
+        <div 
+          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+          style={{ width: `${((currentQuestion + 1) / questoesSimulado.length) * 100}%` }}
+        ></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+      <div className="container mx-auto px-2 md:px-4 py-4 md:py-8">
         <div className="max-w-4xl mx-auto">
           {currentQ && (
             <Card className="mb-6">

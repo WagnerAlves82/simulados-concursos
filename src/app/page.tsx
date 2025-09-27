@@ -9,32 +9,36 @@ export default function HomePage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Header */}
       <header className="container mx-auto px-4 py-6">
-        <nav className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <BookOpen className="h-8 w-8 text-blue-600" />
-            <h1 className="text-2xl font-bold text-gray-900">SimuladosPro</h1>
-          </div>
-          <div className="hidden md:flex space-x-6">
-            <Link href="#apostilas" className="text-gray-600 hover:text-blue-600 transition-colors">
-              Apostilas
-            </Link>
-            <Link href="#simulado-gratuito" className="text-gray-600 hover:text-blue-600 transition-colors">
-              Simulado Grátis
-            </Link>
-            <Link href="#como-funciona" className="text-gray-600 hover:text-blue-600 transition-colors">
-              Como Funciona
-            </Link>
-          </div>
-          <div className="space-x-4">
-            <Link href="/login">
-              <Button variant="outline">Entrar</Button>
-            </Link>
-            <Link href="/login">
-              <Button>Cadastrar</Button>
-            </Link>
-          </div>
-        </nav>
-      </header>
+  <nav className="flex items-center justify-between">
+    <div className="flex items-center space-x-2">
+      <BookOpen className="h-8 w-8 text-blue-600" />
+      <h1 className="text-2xl font-bold text-gray-900">SimuladosPro</h1>
+    </div>
+    <div className="hidden md:flex space-x-6">
+      <Link href="#apostilas" className="text-gray-600 hover:text-blue-600 transition-colors">
+        Apostilas
+      </Link>
+      <Link href="#simulado-gratuito" className="text-gray-600 hover:text-blue-600 transition-colors">
+        Simulado Grátis
+      </Link>
+      <Link href="#como-funciona" className="text-gray-600 hover:text-blue-600 transition-colors">
+        Como Funciona
+      </Link>
+    </div>
+    <div className="flex items-center space-x-2 md:space-x-4">
+      <Link href="/login">
+        <Button variant="outline" size="sm" className="md:size-default">
+          Entrar
+        </Button>
+      </Link>
+      <Link href="/login">
+        <Button size="sm" className="md:size-default">
+          Cadastrar
+        </Button>
+      </Link>
+    </div>
+  </nav>
+</header>
       
 
       {/* Hero Section - REFORMULADA */}
@@ -68,24 +72,24 @@ export default function HomePage() {
           </div>
 
           {/* Prova Social - ATUALIZADA */}
-          <div className="flex items-center justify-center space-x-8 text-sm text-gray-600 mb-16">
-            <div className="flex items-center space-x-2">
-              <Users className="h-4 w-4" />
-              <span>800+ aprovados</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Trophy className="h-4 w-4" />
-              <span>HC Assessoria</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Star className="h-4 w-4" />
-              <span>4.9/5 avaliação</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Download className="h-4 w-4" />
-              <span>Material completo</span>
-            </div>
+         <div className="flex flex-wrap items-center justify-center gap-4 md:gap-8 text-sm text-gray-600 mb-16 px-4">
+          <div className="flex items-center space-x-2">
+            <Users className="h-4 w-4" />
+            <span>800+ aprovados</span>
           </div>
+          <div className="flex items-center space-x-2">
+            <Trophy className="h-4 w-4" />
+            <span>HC Assessoria</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Star className="h-4 w-4" />
+            <span>4.9/5 avaliação</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Download className="h-4 w-4" />
+            <span>Material completo</span>
+          </div>
+        </div>
         </div>
       </section>
 
