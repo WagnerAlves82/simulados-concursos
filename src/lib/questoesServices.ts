@@ -36,7 +36,31 @@ export class QuestoesService {
       return false;
     }
   }
+async buscarCargos(): Promise<Array<{
+  id: number;
+  nome: string;
+  descricao: string | null;
+  nivel_escolaridade: string | null;
+  banca: string | null;
+}>> {
+  try {
+    const { data: cargos, error } = await this.supabase
+      .from('cargos')
+      .select('id, nome, descricao, nivel_escolaridade, banca')
+      .eq('ativo', true)
+      .order('nome');
 
+    if (error) {
+      console.error('Erro ao buscar cargos:', error);
+      throw new Error(error.message);
+    }
+
+    return cargos || [];
+  } catch (error) {
+    console.error('Erro ao buscar cargos:', error);
+    throw error;
+  }
+}
   async buscarQuestoesPorCargo(cargoId: number): Promise<{
     questoes: QuestaoCompleta[];
     areas: AreaEstatistica[];
@@ -121,32 +145,38 @@ export class QuestoesService {
       }));
 
       // 5. Montar estatísticas das áreas - CORRIGIDO
-      let areasEstatisticas: AreaEstatistica[];
+      // 5. Montar estatísticas das áreas - CORRIGIDO
+let areasEstatisticas: AreaEstatistica[];
 
-      if (cargoAreas && cargoAreas.length > 0) {
-        areasEstatisticas = cargoAreas.map(ca => ({
-          id: ca.area_id!,
-          nome: areaMap[ca.area_id!] || 'Área Desconhecida',
-          total_questoes: ca.numero_questoes,
-          peso: ca.peso || 1.0,
-          questoes_respondidas: 0,
-          acertos: 0,
-          percentual: 0
-        }));
-      } else {
-        areasEstatisticas = areaIds.map(areaId => {
-          const questoesDaArea = questoes.filter(q => q.area_id === areaId);
-          return {
-            id: areaId!,
-            nome: areaMap[areaId!] || 'Área Desconhecida',
-            total_questoes: questoesDaArea.length,
-            peso: 1.0,
-            questoes_respondidas: 0,
-            acertos: 0,
-            percentual: 0
-          };
-        });
-      }
+if (cargoAreas && cargoAreas.length > 0) {
+  areasEstatisticas = cargoAreas.map(ca => {
+    // CONTAR QUESTÕES REAIS EM VEZ DE USAR VALOR FIXO
+    const questoesDaArea = questoes.filter(q => q.area_id === ca.area_id);
+    
+    return {
+      id: ca.area_id!,
+      nome: areaMap[ca.area_id!] || 'Área Desconhecida',
+      total_questoes: questoesDaArea.length, // ← CORREÇÃO: usar contagem real
+      peso: ca.peso || 1.0,
+      questoes_respondidas: 0,
+      acertos: 0,
+      percentual: 0
+    };
+  });
+} else {
+  areasEstatisticas = areaIds.map(areaId => {
+    const questoesDaArea = questoes.filter(q => q.area_id === areaId);
+    return {
+      id: areaId!,
+      nome: areaMap[areaId!] || 'Área Desconhecida',
+      total_questoes: questoesDaArea.length,
+      peso: 1.0,
+      questoes_respondidas: 0,
+      acertos: 0,
+      percentual: 0
+    };
+  });
+}
 
       console.log(`Busca concluída: ${questoesCompletas.length} questões, ${areasEstatisticas.length} áreas`);
       

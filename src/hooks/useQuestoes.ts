@@ -1,9 +1,10 @@
-// src/hooks/useQuestoes.ts - VERSÃO COMPLETA
+// src/hooks/useQuestoes.ts - VERSÃO CORRIGIDA COMPLETA
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { QuestoesService, QuestaoCompleta, AreaEstatistica } from '@/lib/questoesServices'
 import { useAuth } from '@/contexts/AuthProvider'
 
-export function useQuestoes(cargoId: number = 1) {
+export function useQuestoes(cargoId: number = 4)
+ {
   const { user } = useAuth()
   const [questoes, setQuestoes] = useState<QuestaoCompleta[]>([])
   const [areas, setAreas] = useState<AreaEstatistica[]>([])
@@ -18,6 +19,13 @@ export function useQuestoes(cargoId: number = 1) {
   const questoesService = useMemo(() => new QuestoesService(), [])
 
   const carregarQuestoes = useCallback(async (forceReload = false) => {
+    // Não carregar se cargoId for inválido
+    if (!cargoId || cargoId <= 0) {
+      console.log('CargoId inválido, aguardando seleção...')
+      setLoading(false)
+      return
+    }
+
     if (!forceReload && lastCargoId === cargoId && questoes.length > 0) {
       console.log('Questões já carregadas para este cargo, pulando...')
       return
@@ -33,31 +41,21 @@ export function useQuestoes(cargoId: number = 1) {
       console.log('Conexão com Supabase OK')
       
       const resultado = await questoesService.buscarQuestoesPorCargo(cargoId)
+      
       console.log('Debug - Raw resultado do service:', {
-      questoes: resultado.questoes.slice(0, 3).map(q => ({
-    id: q.id,
-    area_id: q.area_id,
-    area_nome: q.area_nome,
-    enunciado: q.enunciado.substring(0, 50)
-  })),
-  areas: resultado.areas.map(a => ({
-    id: a.id,
-    nome: a.nome,
-    total_questoes: a.total_questoes
-  }))
-})
-      console.log('Debug - Raw resultado do service:');
-console.log('Questões (primeiras 3):', resultado.questoes.slice(0, 3).map(q => ({
-  id: q.id,
-  area_id: q.area_id,
-  area_nome: q.area_nome,
-  enunciado: q.enunciado?.substring(0, 50) + '...'
-})));
-console.log('Áreas:', resultado.areas.map(a => ({
-  id: a.id,
-  nome: a.nome,
-  total_questoes: a.total_questoes
-})));
+        questoes: resultado.questoes.slice(0, 3).map(q => ({
+          id: q.id,
+          area_id: q.area_id,
+          area_nome: q.area_nome,
+          enunciado: q.enunciado?.substring(0, 50) + '...'
+        })),
+        areas: resultado.areas.map(a => ({
+          id: a.id,
+          nome: a.nome,
+          total_questoes: a.total_questoes
+        }))
+      })
+
       console.log(`Resultado da busca:`, {
         totalQuestoes: resultado.questoes.length,
         totalAreas: resultado.areas.length,
@@ -94,10 +92,16 @@ console.log('Áreas:', resultado.areas.map(a => ({
   }, [cargoId, lastCargoId, questoes.length, questoesService])
 
   useEffect(() => {
-    if (cargoId) {
-      carregarQuestoes()
+  if (cargoId) {
+    // Limpar estado anterior quando cargo muda
+    if (lastCargoId !== cargoId) {
+      setQuestoes([])
+      setAreas([])
+      setError(null)
     }
-  }, [cargoId, carregarQuestoes])
+    carregarQuestoes()
+  }
+}, [cargoId, carregarQuestoes])
 
   // Gerar simulado completo com níveis de dificuldade
   const gerarSimulado = useCallback(async (
@@ -121,7 +125,7 @@ console.log('Áreas:', resultado.areas.map(a => ({
   const gerarSimuladoPorArea = useCallback(async (
     areaId: number,
     dificuldades: number[] = [1, 2, 3],
-    limite: number = 30
+    limite: number = 80
   ): Promise<QuestaoCompleta[]> => {
     try {
       console.log(`Gerando simulado da área ${areaId} com ${limite} questões`)

@@ -1,7 +1,7 @@
 // src/app/simulado/page.tsx - VERSÃO ATUALIZADA
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +10,9 @@ import { LoginModal } from '@/components/ui/LoginModal'; // NOVO: Import do moda
 import { useAuth } from '@/contexts/AuthProvider';
 import { useQuestoes } from '@/hooks/useQuestoes';
 import { QuestaoCompleta } from '@/lib/questoesServices';
+import { createClient } from '@/lib/supabase';
+
+
 
 import { 
   BookOpen, 
@@ -29,24 +32,9 @@ import {
   RefreshCw
 } from 'lucide-react';
 
+
 const SimuladoPage = () => {
   const { user, profile, signOut } = useAuth();
-  const { 
-    questoes: questoesDisponiveis, 
-    areas, 
-    loading: loadingQuestoes, 
-    error: errorQuestoes,
-    gerarSimulado,
-    gerarSimuladoPorArea, // NOVO
-    salvarResultado,
-    recarregar,
-    registrarQuestaoRespondida,
-    showLoginModal,
-    fecharModal,
-    getInfoModal,
-    debug
-  } = useQuestoes(1);
-  
   const [questoesSimulado, setQuestoesSimulado] = useState<QuestaoCompleta[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<{[key: number]: string}>({});
@@ -65,21 +53,85 @@ const SimuladoPage = () => {
   // NOVOS: Estados para modo de estudo
   const [tipoSimulado, setTipoSimulado] = useState<'completo' | 'area'>('completo');
   const [areaSelecionada, setAreaSelecionada] = useState<number | null>(null);
-  const [quantidadeQuestoes, setQuantidadeQuestoes] = useState(30);
+  const [quantidadeQuestoes, setQuantidadeQuestoes] = useState(40);
   
-  // Estados para controle do modal
-  const [beneficiosModal, setBeneficiosModal] = useState<string[]>([]);
+ // Estados para controle do modal
+const [beneficiosModal, setBeneficiosModal] = useState<string[]>([]);
+// NOVOS: Estados para seleção de cargo
+const [cargos, setCargos] = useState<any[]>([]);
+const [cargoSelecionado, setCargoSelecionado] = useState<number>(4);
+const [loadingCargos, setLoadingCargos] = useState(false);
+const supabase = createClient();
 
-  useEffect(() => {
-    console.log('Debug SimuladoPage:', {
-      questoesDisponiveis: questoesDisponiveis.length,
-      areas: areas.length,
-      loading: loadingQuestoes,
-      error: errorQuestoes,
-      showLoginModal, // NOVO
-      debug
-    });
-  }, [questoesDisponiveis, areas, loadingQuestoes, errorQuestoes, showLoginModal, debug]);
+ const { 
+    questoes: questoesDisponiveis, 
+    areas, 
+    loading: loadingQuestoes, 
+    error: errorQuestoes,
+    gerarSimulado,
+    gerarSimuladoPorArea,
+    salvarResultado,
+    recarregar,
+    registrarQuestaoRespondida,
+    showLoginModal,
+    fecharModal,
+    getInfoModal,
+    debug
+  } = useQuestoes(cargoSelecionado);
+
+
+
+
+  // Carregar cargos disponíveis
+const carregarCargos = useCallback(async () => {
+  try {
+    setLoadingCargos(true);
+    const { data, error } = await supabase
+      .from('cargos')
+      .select('id, nome, descricao, nivel_escolaridade, banca')
+      .eq('ativo', true)
+      .order('nome');
+      
+    if (data) {
+      setCargos(data);
+      console.log('Cargos carregados:', data);
+    }
+    if (error) {
+      console.error('Erro ao carregar cargos:', error);
+    }
+  } catch (err) {
+    console.error('Erro ao buscar cargos:', err);
+  } finally {
+    setLoadingCargos(false);
+  }
+}, []);
+
+// Carregar cargos no início
+useEffect(() => {
+  carregarCargos();
+}, [carregarCargos]);
+
+// Ajustar quantidade quando área muda
+useEffect(() => {
+  if (areaSelecionada && areas.length > 0) {
+    const areaSel = areas.find(a => a.id === areaSelecionada);
+    if (areaSel) {
+      setQuantidadeQuestoes(Math.min(40, areaSel.total_questoes));
+    }
+  }
+}, [areaSelecionada, areas]);
+
+  // No SimuladoPage, no useEffect de debug:
+useEffect(() => {
+  console.log('🔍 Debug SimuladoPage:', {
+    cargoSelecionado,
+    questoesDisponiveis: questoesDisponiveis.length,
+    areas: areas.length,
+    loading: loadingQuestoes,
+    error: errorQuestoes,
+    debug
+  });
+}, [cargoSelecionado, questoesDisponiveis, areas, loadingQuestoes, errorQuestoes, debug]);
 
   // Timer
   useEffect(() => {
@@ -326,17 +378,59 @@ const SimuladoPage = () => {
 
         <div className="container mx-auto px-4 py-8">
           <div className="max-w-2xl mx-auto text-center">
+            {/* NOVO: Seletor de Cargo */}
+<Card className="mb-8">
+  <CardHeader>
+    <CardTitle>Escolha o Cargo</CardTitle>
+    <p className="text-sm text-gray-600">Selecione o cargo para o qual deseja fazer o simulado</p>
+  </CardHeader>
+  <CardContent>
+    {loadingCargos ? (
+      <div className="text-center py-4">
+        <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+        <span className="text-sm text-gray-600">Carregando cargos...</span>
+      </div>
+    ) : (
+      <div className="space-y-3">
+        {cargos.map((cargo) => (
+          <button
+            key={cargo.id}
+            onClick={() => setCargoSelecionado(cargo.id)}
+            className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
+              cargoSelecionado === cargo.id
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            <div className="flex justify-between items-start">
+              <div>
+                <div className="font-semibold text-lg">{cargo.nome}</div>
+                <div className="text-sm text-gray-600 mt-1">{cargo.descricao}</div>
+                <div className="text-xs text-gray-500 mt-2">
+                  {cargo.nivel_escolaridade} • {cargo.banca}
+                </div>
+              </div>
+              {cargoSelecionado === cargo.id && (
+                <CheckCircle2 className="h-6 w-6 text-blue-600" />
+              )}
+            </div>
+          </button>
+        ))}
+      </div>
+    )}
+  </CardContent>
+</Card>
             <Badge className="mb-6 bg-green-100 text-green-800 border-green-200">
               Simulado Gratuito
             </Badge>
             
             <h2 className="text-4xl font-bold text-gray-900 mb-6">
-              Simulado - Agente de Educação Infantil
-            </h2>
-            
-            <p className="text-xl text-gray-600 mb-8">
-              São Lourenço do Oeste/SC - HC Assessoria
-            </p>
+          Simulado - {cargos.find(c => c.id === cargoSelecionado)?.nome || 'Carregando...'}
+        </h2>
+
+        <p className="text-xl text-gray-600 mb-8">
+          São Lourenço do Oeste/SC - HC Assessoria
+        </p>
 
             <Card className="mb-8">
               <CardContent className="p-6">
@@ -552,16 +646,18 @@ const SimuladoPage = () => {
             )}
 
             <Button 
-              onClick={handleStart} 
-              size="lg" 
-              className="px-8 py-4 text-xl"
-              disabled={
-                gerandoSimulado || 
-                questoesDisponiveis.length === 0 || 
-                dificuldadesSelecionadas.length === 0 ||
-                (tipoSimulado === 'area' && !areaSelecionada)
-              }
-            >
+            onClick={handleStart} 
+            size="lg" 
+            className="px-8 py-4 text-xl"
+            disabled={
+              gerandoSimulado || 
+              questoesDisponiveis.length === 0 || 
+              dificuldadesSelecionadas.length === 0 ||
+              (tipoSimulado === 'area' && !areaSelecionada) ||
+              !cargoSelecionado || // NOVO: Verificar se cargo foi selecionado
+              loadingCargos
+            }
+          >
               {gerandoSimulado ? (
                 <>
                   <Loader2 className="mr-2 h-6 w-6 animate-spin" />
@@ -786,36 +882,7 @@ const SimuladoPage = () => {
                     </button>
                   ))}
                 </div>
-
-              
-                {/* Feedback manual para simulado completo */}
-                {answers[currentQ.id] && tipoSimulado === 'completo' && (
-                  <div className="mt-6">
-                    <Button
-                      onClick={() => toggleFeedback(currentQ.id)}
-                      variant="outline"
-                      size="sm"
-                    >
-                      {showFeedback[currentQ.id] ? 'Ocultar' : 'Ver'} Explicação
-                    </Button>
-                    
-                    {showFeedback[currentQ.id] && (
-                      <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                        <div className="flex items-center mb-2">
-                          {answers[currentQ.id] === currentQ.resposta_correta ? (
-                            <CheckCircle2 className="h-5 w-5 text-green-600 mr-2" />
-                          ) : (
-                            <XCircle className="h-5 w-5 text-red-600 mr-2" />
-                          )}
-                          <span className="font-semibold">
-                            Resposta correta: {currentQ.resposta_correta}
-                          </span>
-                        </div>
-                        <p className="text-gray-700">{currentQ.feedback}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
+             
               </CardContent>
               {/* ADICIONAR após o CardContent da questão: */}
 
